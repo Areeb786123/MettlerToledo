@@ -8,89 +8,70 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Bundle
-import android.os.Handler
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.areeb.mettlertoledo.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
-    private var _binding: ActivityMainBinding? = null
-    private val binding get() = _binding!!
+    private lateinit var _binding: ActivityMainBinding
+    private val binding get() = _binding
+    private lateinit var usbManager: UsbManager
+    private lateinit var usbReceiver: BroadcastReceiver
 
     companion object {
-        const val ACTION_USB_PERMISSION = "com.example.usbpermission"
+        private const val ACTION_USB_PERMISSION = "com.areeb.mettlertoledo.USB_PERMISSION"
     }
 
-    private lateinit var usbManager: UsbManager
-    private lateinit var device: UsbDevice
-    private var isPermissionGranted = false
-    private var isReadingWeight = false
-    private lateinit var handler: Handler
-    private lateinit var weightRunnable: Runnable
-
-    lateinit var usbReceiver: BroadcastReceiver
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         _binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(_binding!!.root)
+        val view = _binding.root
+        setContentView(view)
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
 
         usbReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == ACTION_USB_PERMISSION) {
-                    synchronized(this) {
-                        val granted =
-                            intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                        if (granted) {
-                            val usbDevices: HashMap<String, UsbDevice>? = usbManager.deviceList
-                            usbDevices?.values?.firstOrNull()?.let { device ->
-                                if (usbManager.hasPermission(device)) {
-                                    val weightData = retrieveWeightDataFromDevice(device)
-                                    updateWeightTextView(weightData)
-                                }
-                            }
-                        }
+                    val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                    val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+
+                    if (granted && device != null) {
+                        // Permission granted, read data from the USB device
+                        val data = readDataFromUsbDevice(device)
+                        binding.wightTextView.text = data
+                        Log.e("dataXXX", data)
                     }
                 }
             }
         }
 
-        val usbDevices: HashMap<String, UsbDevice>? = usbManager.deviceList
-        usbDevices?.values?.firstOrNull()?.let { device ->
-            val permissionIntent = PendingIntent.getBroadcast(
-                this,
-                0,
-                Intent(ACTION_USB_PERMISSION),
-                PendingIntent.FLAG_IMMUTABLE,
-            )
+        // Register the USB receiver to listen for USB permission broadcasts
+        val filter = IntentFilter(ACTION_USB_PERMISSION)
+        registerReceiver(usbReceiver, filter)
 
-            registerReceiver(usbReceiver, IntentFilter(ACTION_USB_PERMISSION))
+        // Request permission to access the USB device
+        val usbDevices: HashMap<String, UsbDevice>? = usbManager.deviceList
+        usbDevices?.values?.forEach { device ->
+            val permissionIntent =
+                PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), 0)
             usbManager.requestPermission(device, permissionIntent)
         }
     }
 
-    private fun retrieveWeightDataFromDevice(device: UsbDevice): String {
-        // Implement your code to retrieve weight data from the device here
-        // Replace this with your actual implementation
-        return "100.5 kg" // Sample weight data
-    }
-
-    private fun updateWeightTextView(weightData: String) {
-        Log.e("titis", weightData)
-
-        binding.wightTextView.text = weightData
-    }
-
-    override fun onResume() {
-        super.onResume()
-        val filter = IntentFilter(ACTION_USB_PERMISSION)
-        registerReceiver(usbReceiver, filter)
-        // ...
-    }
-
-    override fun onPause() {
-        super.onPause()
+    override fun onDestroy() {
+        super.onDestroy()
         unregisterReceiver(usbReceiver)
+    }
+
+    private fun readDataFromUsbDevice(device: UsbDevice): String {
+        // Implement your code to read data from the USB device here
+        // Return the data as a String
+        // Example: return "Data read from USB device"
+        // Replace this example with your actual code to read data from the USB device
+
+        // Simulating data read for demonstration purposes
+        val simulatedData = device.toString()
+        return simulatedData
     }
 }
